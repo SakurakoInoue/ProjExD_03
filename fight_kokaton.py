@@ -1,14 +1,11 @@
+import os
 import random
 import sys
 import time
-
 import pygame as pg
-
-
 WIDTH = 1600  # ゲームウィンドウの幅
 HEIGHT = 900  # ゲームウィンドウの高さ
-
-
+MAIN_DIR = os.path.split(os.path.abspath(__file__))[0]
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     """
     オブジェクトが画面内or画面外を判定し，真理値タプルを返す関数
@@ -21,8 +18,6 @@ def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     if obj_rct.top < 0 or HEIGHT < obj_rct.bottom:
         tate = False
     return yoko, tate
-
-
 class Bird:
     """
     ゲームキャラクター（こうかとん）に関するクラス
@@ -33,14 +28,13 @@ class Bird:
         pg.K_LEFT: (-5, 0),
         pg.K_RIGHT: (+5, 0),
     }
-
     def __init__(self, num: int, xy: tuple[int, int]):
         """
         こうかとん画像Surfaceを生成する
         引数1 num：こうかとん画像ファイル名の番号
         引数2 xy：こうかとん画像の位置座標タプル
         """
-        # img0 = pg.transform.rotozoom(pg.image.load(f"ex03/fig/{num}.png"), 0, 2.0)
+        # img0 = pg.transform.rotozoom(pg.image.load(f"{MAIN_DIR}/fig/{num}.png"), 0, 2.0)
         # img = pg.transform.flip(img0, True, False)  # デフォルトのこうかとん（右向き）
         # self.imgs = {  # 0度から反時計回りに定義
         #     (+5, 0): img,  # 右
@@ -54,7 +48,7 @@ class Bird:
         # }
         self.img = pg.transform.flip(  # 左右反転
             pg.transform.rotozoom(  # 2倍に拡大
-                pg.image.load(f"ex03/fig/{num}.png"), 
+                pg.image.load(f"{MAIN_DIR}/fig/{num}.png"), 
                 0, 
                 2.0), 
             True, 
@@ -62,16 +56,14 @@ class Bird:
         )
         self.rct = self.img.get_rect()
         self.rct.center = xy
-
     def change_img(self, num: int, screen: pg.Surface):
         """
         こうかとん画像を切り替え，画面に転送する
         引数1 num：こうかとん画像ファイル名の番号
         引数2 screen：画面Surface
         """
-        self.img = pg.transform.rotozoom(pg.image.load(f"ex03/fig/{num}.png"), 0, 2.0)
+        self.img = pg.transform.rotozoom(pg.image.load(f"{MAIN_DIR}/fig/{num}.png"), 0, 2.0)
         screen.blit(self.img, self.rct)
-
     def update(self, key_lst: list[bool], screen: pg.Surface):
         """
         押下キーに応じてこうかとんを移動させる
@@ -87,8 +79,6 @@ class Bird:
         if check_bound(self.rct) != (True, True):
             self.rct.move_ip(-sum_mv[0], -sum_mv[1])
         screen.blit(self.img, self.rct)
-
-
 class Bomb:
     """
     爆弾に関するクラス
@@ -105,7 +95,6 @@ class Bomb:
         self.rct = self.img.get_rect()
         self.rct.center = random.randint(0, WIDTH), random.randint(0, HEIGHT)
         self.vx, self.vy = +5, +5
-
     def update(self, screen: pg.Surface):
         """
         爆弾を速度ベクトルself.vx, self.vyに基づき移動させる
@@ -120,12 +109,14 @@ class Bomb:
         screen.blit(self.img, self.rct)
 
 class Beam:
-    def __init__(self, bird, ):
-        self.img = pg.image.load(f"ex03/fig/beam.png")
+    def __init__(self, bird: Bird):
+        self.img = pg.image.load(f"{MAIN_DIR}/fig/beam.png")
         self.rct = self.img.get_rect()
-        self.rct.center = Bird.rct.center#こうかとんの中心座標を取得
+        self.rct.center = bird.rct.center   # こうかとんの中心座標を取得
+        self.rct.centery = bird.rct.centery   # こうかとんの中心座標を取得
+        self.rct.centerx = bird.rct.centerx+bird.rct.width/2
         self.vx, self.vy = +5, 0
-        
+
     def update(self, screen: pg.Surface):
         """
         ビームを速度ベクトルself.vx, self.vyに基づき移動させる
@@ -133,14 +124,13 @@ class Beam:
         """
         self.rct.move_ip(self.vx, self.vy)
         screen.blit(self.img, self.rct)
-    
-    
 def main():
     pg.display.set_caption("たたかえ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))    
-    bg_img = pg.image.load("ex03/fig/pg_bg.jpg")
+    bg_img = pg.image.load(f"{MAIN_DIR}/fig/pg_bg.jpg")
     bird = Bird(3, (900, 400))
     bomb = Bomb((255, 0, 0), 10)
+    beam = None
 
     clock = pg.time.Clock()
     tmr = 0
@@ -148,28 +138,33 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return
-            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:#スペースキーが押されたら
-                beam = Beam(bird)#ビームインスタンスの生成
-            
-        
+            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:  # スペースキーが押されたら
+                beam = Beam(bird)  # ビームインスタンスの生成
+
         screen.blit(bg_img, [0, 0])
-        
-        if bird.rct.colliderect(bomb.rct):
-            # ゲームオーバー時に，こうかとん画像を切り替え，1秒間表示させる
-            bird.change_img(8, screen)
-            pg.display.update()
-            time.sleep(1)
-            return
+
+        if bomb is not None:
+            if bird.rct.colliderect(bomb.rct):
+                # ゲームオーバー時に，こうかとん画像を切り替え，1秒間表示させる
+                bird.change_img(8, screen)
+                pg.display.update()
+                time.sleep(1)
+                return
+
+        if beam is not None and bomb is not None:
+            if beam.rct.colliderect(bomb.rct):
+                beam = None
+                bomb = None
 
         key_lst = pg.key.get_pressed()
         bird.update(key_lst, screen)
-        bomb.update(screen)
-        beam.update(screen)
+        if bomb is not None:
+            bomb.update(screen)
+        if beam is not None:
+            beam.update(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
-
-
 if __name__ == "__main__":
     pg.init()
     main()
